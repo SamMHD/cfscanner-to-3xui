@@ -1,0 +1,126 @@
+name: Build
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: android
+            goarch: arm64
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: linux
+            goarch: riscv64
+          - goos: linux
+            goarch: mips64
+          - goos: linux
+            goarch: mips64le
+          - goos: linux
+            goarch: arm
+            goarm: "7"
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+
+    runs-on: ubuntu-latest
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+      GOARM: ${{ matrix.goarm }}
+      CGO_ENABLED: 0
+      version: ${{ github.ref_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set asset name
+        run: |
+          export _NAME=$GOOS-$GOARCH${GOARM:+$GOARM}${GOMIPS:+$GOMIPS}
+          echo "ASSET_NAME=$_NAME" >> $GITHUB_ENV
+          echo "REF=${GITHUB_SHA::6}" >> $GITHUB_ENV
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          check-latest: true
+
+      - name: Build
+        run: |
+          go build -v -o build_assets/ -trimpath -ldflags "-s -w -X main.version=${version}" .
+
+      - name: Create ZIP
+        shell: bash
+        run: |
+          pushd ./build_assets || exit 1
+          touch -mt $(date +%Y01010000) *
+          zip -9vr ../cfscanner-to-3xui_${{ env.ASSET_NAME }}.zip .
+          popd || exit 1
+
+      - name: Rename build dir
+        run: mv ./build_assets ./cfscanner-to-3xui_${{ env.ASSET_NAME }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfscanner-to-3xui_${{ env.ASSET_NAME }}
+          path: |
+            ./cfscanner-to-3xui_${{ env.ASSET_NAME }}/*
+
+      - name: Upload to release
+        uses: svenstaro/upload-release-action@v2
+        if: github.event_name == 'release'
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./cfscanner-to-3xui_${{ env.ASSET_NAME }}.zip*
+          tag: ${{ github.ref }}
+          file_glob: true
+
+  docker:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/cfscanner-to-3xui:${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}/cfscanner-to-3xui:latest
