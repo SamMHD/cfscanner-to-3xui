@@ -11,4 +11,5 @@ FROM alpine:3.20
 RUN apk --no-cache add ca-certificates
 WORKDIR /app
 COPY --from=builder /cfscanner-to-3xui .
+COPY --from=builder /src/ip.txt .
 ENTRYPOINT ["./cfscanner-to-3xui", "run-cron"]

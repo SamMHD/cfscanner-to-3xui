@@ -65,6 +65,9 @@ jobs:
         run: |
           go build -v -o build_assets/ -trimpath -ldflags "-s -w -X main.version=${version}" .
 
+      - name: Add ip.txt to build
+        run: cp ip.txt build_assets/
+
       - name: Create ZIP
         shell: bash
         run: |
@@ -125,5 +128,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ env.IMAGE_REPO }}/cfscanner-to-3xui:${{ github.ref_name }}
-            ghcr.io/${{ env.IMAGE_REPO }}/cfscanner-to-3xui:latest
+            ghcr.io/${{ env.IMAGE_REPO }}:${{ github.ref_name }}
+            ghcr.io/${{ env.IMAGE_REPO }}:latest
