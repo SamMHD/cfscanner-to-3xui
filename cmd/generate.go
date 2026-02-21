@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -96,6 +97,14 @@ func readConfigs(dir string) ([]map[string]interface{}, error) {
 	return configs, nil
 }
 
+func outboundPrefix() string {
+	p := strings.TrimSpace(os.Getenv("OUTBOUND_PREFIX"))
+	if p == "" {
+		return "cf-clean-"
+	}
+	return p
+}
+
 func cloneAndSetAddress(cfg map[string]interface{}, ip string) (map[string]interface{}, error) {
 	data, err := json.Marshal(cfg)
 	if err != nil {
@@ -105,6 +114,7 @@ func cloneAndSetAddress(cfg map[string]interface{}, ip string) (map[string]inter
 	if err := json.Unmarshal(data, &out); err != nil {
 		return nil, err
 	}
+	prefix := outboundPrefix()
 	protocol, _ := out["protocol"].(string)
 	switch protocol {
 	case "trojan":
@@ -115,7 +125,7 @@ func cloneAndSetAddress(cfg map[string]interface{}, ip string) (map[string]inter
 				}
 			}
 		}
-		out["tag"] = "sam-cf-trojan-" + ip
+		out["tag"] = prefix + "trojan-" + ip
 	case "vless":
 		if settings, ok := out["settings"].(map[string]interface{}); ok {
 			if vnext, ok := settings["vnext"].([]interface{}); ok {
@@ -126,7 +136,7 @@ func cloneAndSetAddress(cfg map[string]interface{}, ip string) (map[string]inter
 				}
 			}
 		}
-		out["tag"] = "sam-cf-vless-" + ip
+		out["tag"] = prefix + "vless-" + ip
 	}
 	return out, nil
 }
