@@ -4,9 +4,10 @@ Copyright © 2026 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"flag"
 	"fmt"
+	"os"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/Ptechgithub/CloudflareScanner/task"
@@ -83,35 +84,86 @@ Options:
 	},
 }
 
-func init() {
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return def
+}
 
+func envFloat(key string, def float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
+	}
+	return def
+}
+
+func envBool(key string, def bool) bool {
+	if v := os.Getenv(key); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			return b
+		}
+	}
+	return def
+}
+
+func envStr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+func init() {
 	var minDelay, maxDelay, downloadTime int
 	var maxLossRate float64
-	flag.IntVar(&task.Routines, "n", 200, "Latency test threads")
-	flag.IntVar(&task.PingTimes, "t", 4, "Latency test times")
-	flag.IntVar(&task.TestCount, "dn", 10, "Download test count")
-	flag.IntVar(&downloadTime, "dt", 10, "Download test time")
-	flag.IntVar(&task.TCPPort, "tp", 443, "Specify test port")
-	flag.StringVar(&task.URL, "url", "https://speed.cloudflare.com/__down?bytes=52428800", "Specify test address")
 
-	flag.BoolVar(&task.Httping, "httping", false, "Switch test mode")
-	flag.IntVar(&task.HttpingStatusCode, "httping-code", 0, "Valid status code")
-	flag.StringVar(&task.HttpingCFColo, "cfcolo", "", "Match specified region")
+	// Latency test threads (default 200, max 1000)
+	task.Routines = envInt("SCAN_N", 200)
+	// Latency test times per IP
+	task.PingTimes = envInt("SCAN_T", 4)
+	// Number of IPs to run download test on (lowest latency first)
+	task.TestCount = envInt("SCAN_DN", 10)
+	// Max seconds per IP download test
+	downloadTime = envInt("SCAN_DT", 10)
+	// Port for latency/download test
+	task.TCPPort = envInt("SCAN_TP", 443)
+	// URL for HTTPing/download test
+	task.URL = envStr("SCAN_URL", "https://speed.cloudflare.com/__down?bytes=52428800")
 
-	flag.IntVar(&maxDelay, "tl", 9999, "Maximum average latency")
-	flag.IntVar(&minDelay, "tll", 0, "Minimum average latency")
-	flag.Float64Var(&maxLossRate, "tlr", 1, "Maximum loss rate")
-	flag.Float64Var(&task.MinSpeed, "sl", 0, "Minimum download speed")
+	// Use HTTP for latency test instead of TCP
+	task.Httping = envBool("SCAN_HTTPING", false)
+	// Valid HTTP status code for HTTPing (e.g. 200)
+	task.HttpingStatusCode = envInt("SCAN_HTTPING_CODE", 0)
+	// Comma-separated airport codes to match region (HTTPing only)
+	task.HttpingCFColo = envStr("SCAN_CFCOLO", "")
 
-	flag.IntVar(&utils.PrintNum, "p", 10, "Display result count")
-	flag.StringVar(&task.IPFile, "f", "ip.txt", "IP range data file")
-	flag.StringVar(&task.IPText, "ip", "", "Specify IP range data")
-	flag.StringVar(&utils.Output, "o", "ip-scan-result.csv", "Output result file")
+	// Max average latency (ms); filter out higher
+	maxDelay = envInt("SCAN_TL", 9999)
+	// Min average latency (ms); filter out lower
+	minDelay = envInt("SCAN_TLL", 0)
+	// Max loss rate 0–1; filter out higher
+	maxLossRate = envFloat("SCAN_TLR", 1)
+	// Min download speed (MB/s); filter out lower
+	task.MinSpeed = envFloat("SCAN_SL", 0)
 
-	flag.BoolVar(&task.Disable, "dd", false, "Disable download test")
-	flag.BoolVar(&task.TestAll, "allip", false, "Test all IPs")
+	// How many results to print (0 = no print, exit after test)
+	utils.PrintNum = envInt("SCAN_P", 10)
+	// IP range file path
+	task.IPFile = envStr("SCAN_F", "ip.txt")
+	// Inline IP ranges (comma-separated)
+	task.IPText = envStr("SCAN_IP", "")
+	// Output CSV path
+	utils.Output = envStr("SCAN_O", "ip-scan-result.csv")
 
-	flag.Parse()
+	// Disable download test; sort by latency only
+	task.Disable = envBool("SCAN_DD", false)
+	// Test every IP in range (IPv4); default one per /24
+	task.TestAll = envBool("SCAN_ALLIP", false)
 
 	if task.MinSpeed > 0 && time.Duration(maxDelay)*time.Millisecond == utils.InputMaxDelay {
 		fmt.Println("[Tip] When using [-sl] parameter, it is recommended to use [-tl] parameter to avoid continuous testing due to insufficient number of [-dn]...")
