@@ -11,7 +11,11 @@ var runCronCmd = &cobra.Command{
 	Use:   "run-cron",
 	Short: "Run scan/generate/update every N minutes",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		n, _ := cmd.Flags().GetInt("minutes")
+		// Interval in minutes between runs (default 60)
+		n := envInt("CRON_MINUTES", 60)
+		if cmd.Flags().Changed("minutes") {
+			n, _ = cmd.Flags().GetInt("minutes")
+		}
 		if n < 1 {
 			return fmt.Errorf("minutes must be >= 1")
 		}
@@ -30,5 +34,5 @@ var runCronCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(runCronCmd)
-	runCronCmd.Flags().IntP("minutes", "n", 60, "Interval in minutes")
+	runCronCmd.Flags().IntP("minutes", "n", 60, "Interval in minutes (overrides CRON_MINUTES)")
 }
