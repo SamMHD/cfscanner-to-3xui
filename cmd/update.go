@@ -263,5 +263,6 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	xraySetting["outbounds"] = outbounds
 	putPanelConfig(baseURL, token, xraySetting, allowInsecure)
 	restartXrayService(baseURL, token, allowInsecure)
+	fmt.Println("[update] completed")
 	return nil
 }

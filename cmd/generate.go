@@ -48,7 +48,11 @@ func runGenerate(cmd *cobra.Command, args []string) error {
 	enc := json.NewEncoder(f)
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
-	return enc.Encode(outbounds)
+	if err := enc.Encode(outbounds); err != nil {
+		return err
+	}
+	fmt.Println("[generate] completed")
+	return nil
 }
 
 func readIPsFromCSV(path string) ([]string, error) {

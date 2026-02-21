@@ -23,6 +23,7 @@ var runCmd = &cobra.Command{
 			if err := c.RunE(c, nil); err != nil {
 				return fmt.Errorf("%s: %w", name, err)
 			}
+			fmt.Printf("[%s] completed\n", name)
 		}
 		return nil
 	},

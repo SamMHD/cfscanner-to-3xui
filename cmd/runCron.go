@@ -24,8 +24,23 @@ var runCronCmd = &cobra.Command{
 			return runCmd.RunE(runCmd, nil)
 		}
 		for {
-			if err := runOnce(); err != nil {
+			var err error
+			panicked := false
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						fmt.Printf("[run-cron] panic recovered: %v\n", r)
+						panicked = true
+					}
+				}()
+				err = runOnce()
+			}()
+			if panicked {
+				// continue to next cycle
+			} else if err != nil {
 				return err
+			} else {
+				fmt.Println("[run-cron] cycle completed")
 			}
 			time.Sleep(interval)
 		}
